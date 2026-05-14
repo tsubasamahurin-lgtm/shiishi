@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>极简股报 StockBrief — A股大白话分析</title>
+<meta name="description" content="极简股报：给普通散户用的AI大白话股票简报工具，输入股票名或代码，一秒看懂行情。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c27;--border:#2a2a3a;
+    --accent:#7c6fff;--accent2:#5b8df8;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;
+    --text:#f1f1f5;--text2:#9898b0;--text3:#5a5a72;
+    --radius:14px;--shadow:0 8px 32px rgba(0,0,0,.5);
+  }
+  html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  body{display:flex;flex-direction:column;min-height:100vh}
+
+  /* HEADER */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 28px;border-bottom:1px solid var(--border);
+    background:rgba(10,10,15,.8);backdrop-filter:blur(12px);
+    position:sticky;top:0;z-index:100;
+  }
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:36px;height:36px;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:18px}
+  .logo-text{font-size:18px;font-weight:700;letter-spacing:-.3px}
+  .logo-sub{font-size:11px;color:var(--text2);font-weight:400;margin-top:-2px}
+  .settings-btn{
+    background:var(--surface2);border:1px solid var(--border);
+    color:var(--text2);border-radius:50%;width:40px;height:40px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:all .2s;font-size:18px;
+  }
+  .settings-btn:hover{background:var(--surface);color:var(--text);border-color:var(--accent)}
+
+  /* MAIN */
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:60px 20px 40px}
+  .hero{text-align:center;margin-bottom:48px}
+  .hero h1{font-size:clamp(28px,5vw,48px);font-weight:700;letter-spacing:-.5px;
+    background:linear-gradient(135deg,#fff 30%,var(--accent));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{color:var(--text2);font-size:15px;margin-top:10px;max-width:400px;margin-inline:auto}
+
+  /* SEARCH */
+  .search-wrap{width:100%;max-width:560px}
+  .search-box{
+    display:flex;gap:10px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--radius);
+    padding:6px 6px 6px 18px;
+    box-shadow:var(--shadow),0 0 0 0 rgba(124,111,255,0);
+    transition:box-shadow .3s,border-color .3s;
+  }
+  .search-box:focus-within{border-color:var(--accent);box-shadow:var(--shadow),0 0 0 3px rgba(124,111,255,.2)}
+  .search-box input{
+    flex:1;background:transparent;border:none;outline:none;
+    color:var(--text);font-size:16px;font-family:'Inter',sans-serif;
+  }
+  .search-box input::placeholder{color:var(--text3)}
+  #searchBtn{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none;color:#fff;font-size:14px;font-weight:600;
+    padding:10px 22px;border-radius:10px;cursor:pointer;
+    white-space:nowrap;transition:opacity .2s,transform .15s;font-family:'Inter',sans-serif;
+  }
+  #searchBtn:hover{opacity:.9;transform:translateY(-1px)}
+  #searchBtn:active{transform:translateY(0)}
+  #searchBtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .hint{text-align:center;margin-top:12px;font-size:12px;color:var(--text3)}
+
+  /* RESULT */
+  #result{width:100%;max-width:560px;margin-top:32px}
+
+  /* LOADING */
+  .loading{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px}
+  .spinner{width:40px;height:40px;border:3px solid var(--border);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading p{color:var(--text2);font-size:14px}
+
+  /* CARD */
+  .card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);
+    animation:fadeUp .4s ease;
+  }
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  .card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+  .stock-title{font-size:20px;font-weight:700}
+  .stock-code{font-size:12px;color:var(--text3);margin-top:2px}
+  .price-block{text-align:right}
+  .price{font-size:24px;font-weight:700}
+  .price.up{color:var(--red)}
+  .price.down{color:var(--green)}
+  .change{font-size:13px;margin-top:2px}
+  .change.up{color:var(--red)}
+  .change.down{color:var(--green)}
+
+  .emotion-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;
+    margin-bottom:20px;
+  }
+  .emotion-panic{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+  .emotion-optimistic{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+  .emotion-neutral{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+  .emotion-euphoric{background:rgba(124,111,255,.15);color:#7c6fff;border:1px solid rgba(124,111,255,.3)}
+
+  .section{margin-bottom:16px}
+  .section-label{
+    font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.8px;
+    text-transform:uppercase;margin-bottom:8px;
+  }
+  .section-content{font-size:14px;color:var(--text2);line-height:1.8}
+  .section-content li{margin-left:16px;margin-bottom:4px}
+  .summary-box{
+    background:var(--surface2);border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0;padding:12px 16px;
+    font-size:14px;color:var(--text);line-height:1.7;
+  }
+
+  .error-card{
+    background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);
+    border-radius:var(--radius);padding:20px;text-align:center;
+    animation:fadeUp .3s ease;
+  }
+  .error-card p{color:#ef4444;font-size:14px}
+
+  /* MODAL */
+  .modal-bg{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+    z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+  }
+  .modal-bg.open{display:flex}
+  .modal{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:28px;width:90%;max-width:420px;
+    box-shadow:var(--shadow);animation:fadeUp .3s ease;
+  }
+  .modal h2{font-size:18px;font-weight:700;margin-bottom:6px}
+  .modal p{color:var(--text2);font-size:13px;margin-bottom:20px}
+  .modal label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+  .modal input[type=text],.modal input[type=email]{
+    width:100%;background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);padding:10px 14px;border-radius:8px;font-size:14px;
+    outline:none;font-family:'Inter',sans-serif;transition:border-color .2s;margin-bottom:14px;
+  }
+  .modal input:focus{border-color:var(--accent)}
+  .modal-key-status{font-size:12px;margin-bottom:16px;padding:8px 12px;border-radius:8px}
+  .modal-key-status.set{background:rgba(34,197,94,.1);color:#22c55e}
+  .modal-key-status.unset{background:rgba(245,158,11,.1);color:#f59e0b}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+  .btn-secondary{
+    background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+    padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-family:'Inter',sans-serif;
+    transition:all .2s;
+  }
+  .btn-secondary:hover{color:var(--text);border-color:var(--text3)}
+  .btn-primary{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none;color:#fff;padding:9px 18px;border-radius:8px;
+    cursor:pointer;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;transition:opacity .2s;
+  }
+  .btn-primary:hover{opacity:.9}
+
+  /* FOOTER */
+  footer{
+    border-top:1px solid var(--border);padding:32px 24px;
+    background:var(--surface);
+  }
+  .footer-inner{max-width:800px;margin:0 auto;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+  .footer-brand{flex:1;min-width:200px}
+  .footer-brand .name{font-size:16px;font-weight:700;margin-bottom:4px}
+  .footer-brand .tagline{color:var(--text2);font-size:13px;margin-bottom:12px}
+  .footer-brand .email a{color:var(--accent);font-size:13px;text-decoration:none}
+  .footer-brand .email a:hover{text-decoration:underline}
+  .footer-qr{text-align:center}
+  .footer-qr img{width:100px;height:100px;border-radius:10px;border:1px solid var(--border)}
+  .footer-qr p{font-size:11px;color:var(--text3);margin-top:6px}
+  .footer-bottom{
+    max-width:800px;margin:20px auto 0;padding-top:16px;
+    border-top:1px solid var(--border);
+    display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;
+    font-size:11px;color:var(--text3);
+  }
+  .disclaimer{color:var(--text3);font-size:11px}
+
+  @media(max-width:480px){
+    header{padding:14px 16px}
+    main{padding:40px 16px 32px}
+    .footer-inner{gap:20px}
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <div class="logo-text">极简股报</div>
+      <div class="logo-sub">StockBrief · A股大白话</div>
+    </div>
+  </div>
+  <button class="settings-btn" id="settingsBtn" title="设置 API Key" aria-label="设置">⚙️</button>
+</header>
+
+<!-- MAIN -->
+<main>
+  <div class="hero">
+    <h1>搞懂这支股，就这么简单</h1>
+    <p>输入股票名称或代码，AI 帮你用大白话分析，拒绝复杂 K 线</p>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" id="stockInput" placeholder="输入股票名称或代码，如：比亚迪 / 002594" autocomplete="off" aria-label="股票搜索">
+      <button id="searchBtn">查一查 →</button>
+    </div>
+    <p class="hint">仅支持 A 股 · 沪深两市</p>
+  </div>
+
+  <div id="result" role="region" aria-live="polite"></div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="name">灵艺（Link-AI）</div>
+      <div class="tagline">做给普通人用的 AI 工具</div>
+      <div class="email">✉️ <a href="mailto:779446134@qq.com" id="authorEmail">779446134@qq.com</a></div>
+    </div>
+    <div class="footer-qr">
+      <img src="wechat_qr.png" alt="微信二维码" id="qrImg">
+      <p>微信扫码联系</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 极简股报 StockBrief</span>
+    <span class="disclaimer">⚠️ 本工具仅供娱乐参考，不构成任何投资建议，股市有风险，入市需谨慎。</span>
+  </div>
+</footer>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-bg" id="modalBg" role="dialog" aria-modal="true" aria-label="API Key 设置">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <p>填入你自己的 DeepSeek API Key，Key 只存在你的浏览器里，不会上传到任何服务器。</p>
+    <div id="keyStatus" class="modal-key-status unset">⚠️ 尚未设置 API Key，查询功能未激活</div>
+    <label for="apiKeyInput">DeepSeek API Key</label>
+    <input type="text" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <label for="emailInput">作者邮箱（可选，用于页面底部展示）</label>
+    <input type="text" id="emailInput" placeholder="your@email.com">
+    <div class="modal-actions">
+      <button class="btn-secondary" id="clearKeyBtn">清除 Key</button>
+      <button class="btn-secondary" id="cancelBtn">取消</button>
+      <button class="btn-primary" id="saveKeyBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 工具函数 ──────────────────────────────────────
+const $ = id => document.getElementById(id);
+const LS = { get: k => localStorage.getItem(k), set: (k,v) => localStorage.setItem(k,v), del: k => localStorage.removeItem(k) };
+
+// ── A股代码规范化 ──────────────────────────────────
+function normalizeCode(input) {
+  const s = input.trim();
+  if (/^(sh|sz)/i.test(s)) return s.toLowerCase();
+  if (/^6\d{5}$/.test(s)) return 'sh' + s;
+  if (/^(0|3)\d{5}$/.test(s)) return 'sz' + s;
+  if (/^688\d{3}$/.test(s)) return 'sh' + s;
+  return null; // 可能是名称
+}
+
+// ── 新浪财经实时行情 ──────────────────────────────
+async function fetchQuote(code) {
+  const proxy = 'https://api.allorigins.win/raw?url=';
+  const url = `https://hq.sinajs.cn/list=${code}`;
+  const resp = await fetch(proxy + encodeURIComponent(url));
+  const text = await resp.text();
+  const match = text.match(/"([^"]+)"/);
+  if (!match || !match[1] || match[1].split(',').length < 10) return null;
+  const d = match[1].split(',');
+  return {
+    name: d[0],
+    open: parseFloat(d[1]),
+    prevClose: parseFloat(d[2]),
+    price: parseFloat(d[3]),
+    high: parseFloat(d[4]),
+    low: parseFloat(d[5]),
+    volume: Math.round(parseInt(d[8]) / 100),
+    date: d[30],
+    time: d[31],
+  };
+}
+
+// ── 搜索股票名找代码 ──────────────────────────────
+async function searchByName(name) {
+  const proxy = 'https://api.allorigins.win/raw?url=';
+  const url = `https://suggest3.sinajs.cn/suggest/type=11,12&key=${encodeURIComponent(name)}`;
+  try {
+    const resp = await fetch(proxy + encodeURIComponent(url));
+    const text = await resp.text();
+    const match = text.match(/="([^"]+)"/);
+    if (!match) return null;
+    const items = match[1].split(';').filter(Boolean);
+    for (const item of items) {
+      const parts = item.split(',');
+      if (parts.length >= 4) return parts[3]; // e.g. sh600036
+    }
+  } catch(e) { return null; }
+  return null;
+}
+
+// ── DeepSeek AI 分析 ─────────────────────────────
+async function callDeepSeek(apiKey, stockName, code, quote) {
+  const priceInfo = quote
+    ? `当前价: ${quote.price}元，涨跌: ${(quote.price - quote.prevClose).toFixed(2)}元 (${(((quote.price - quote.prevClose)/quote.prevClose)*100).toFixed(2)}%)，今日最高: ${quote.high}，最低: ${quote.low}，成交量: ${quote.volume}手`
+    : '（实时行情获取失败，请基于已知信息分析）';
+
+  const systemPrompt = `你是专门给普通散户解读A股的助手。规则：
+1. 用大白话，绝对禁止用"赋能""闭环""下沉""赛道""生态"等词
+2. 必须输出以下三个板块，格式严格如下：
+【近期动向】
+- 要点1
+- 要点2
+- 要点3（每条一句话，最多3条）
+【市场情绪】
+😱恐慌 / 😐观望 / 😊乐观 / 🚀亢奋（只选一个，后面跟一句理由）
+【一句话建议】
+直接给出一句操作建议（不超过40字，不可给出具体价格）
+3. 整体不超过200字`;
+
+  const userPrompt = `请分析A股股票：${stockName}（代码：${code || '未知'}）
+实时行情：${priceInfo}
+请给出简洁的大白话分析。`;
+
+  const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      temperature: 0.7, max_tokens: 600
+    })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(()=>({error:{message:'未知错误'}}));
+    throw new Error(err.error?.message || `HTTP ${resp.status}`);
+  }
+  const data = await resp.json();
+  return data.choices[0].message.content;
+}
+
+// ── 解析 AI 输出 ─────────────────────────────────
+function parseAIOutput(text) {
+  const sections = {};
+  const matches = text.matchAll(/【(近期动向|市场情绪|一句话建议)】\s*([\s\S]*?)(?=【|$)/g);
+  for (const m of matches) sections[m[1]] = m[2].trim();
+  return sections;
+}
+
+function getEmotionClass(emotionText) {
+  if (emotionText.includes('恐慌')) return 'emotion-panic';
+  if (emotionText.includes('亢奋')) return 'emotion-euphoric';
+  if (emotionText.includes('乐观')) return 'emotion-optimistic';
+  return 'emotion-neutral';
+}
+
+// ── 渲染结果卡片 ──────────────────────────────────
+function renderCard(stockName, code, quote, aiText) {
+  const sections = parseAIOutput(aiText);
+  const change = quote ? quote.price - quote.prevClose : 0;
+  const changePct = quote ? ((change / quote.prevClose) * 100).toFixed(2) : 0;
+  const dir = change >= 0 ? 'up' : 'down';
+  const arrow = change >= 0 ? '▲' : '▼';
+
+  const dynamicHTML = sections['近期动向']
+    ? '<ul>' + sections['近期动向'].split('\n').filter(l=>l.trim()).map(l=>`<li>${l.replace(/^[-•]\s*/,'')}</li>`).join('') + '</ul>'
+    : aiText;
+
+  const emotionText = sections['市场情绪'] || '😐观望';
+  const emotionClass = getEmotionClass(emotionText);
+  const summary = sections['一句话建议'] || '';
+
+  $('result').innerHTML = `
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="stock-title">${stockName}</div>
+        <div class="stock-code">${code ? code.toUpperCase() : '— A股'}</div>
+      </div>
+      ${quote ? `<div class="price-block">
+        <div class="price ${dir}">¥${quote.price.toFixed(2)}</div>
+        <div class="change ${dir}">${arrow} ${Math.abs(change).toFixed(2)} (${Math.abs(changePct)}%)</div>
+      </div>` : ''}
+    </div>
+    <div class="emotion-badge ${emotionClass}">${emotionText}</div>
+    <div class="section">
+      <div class="section-label">近期动向</div>
+      <div class="section-content">${dynamicHTML}</div>
+    </div>
+    ${summary ? `<div class="section">
+      <div class="section-label">一句话建议</div>
+      <div class="summary-box">${summary}</div>
+    </div>` : ''}
+    ${quote ? `<div style="margin-top:12px;font-size:11px;color:var(--text3)">行情更新：${quote.date} ${quote.time}</div>` : ''}
+  </div>`;
+}
+
+// ── 主查询流程 ────────────────────────────────────
+async function doSearch() {
+  const apiKey = LS.get('ds_api_key');
+  if (!apiKey) {
+    $('result').innerHTML = `<div class="error-card"><p>🔑 还没设置 API Key，点右上角 ⚙️ 填一下就好了</p></div>`;
+    return;
+  }
+  const raw = $('stockInput').value.trim();
+  if (!raw) { $('stockInput').focus(); return; }
+
+  $('searchBtn').disabled = true;
+  $('result').innerHTML = `<div class="loading"><div class="spinner"></div><p>正在查询，请稍候…</p></div>`;
+
+  try {
+    let code = normalizeCode(raw);
+    let displayName = raw;
+
+    if (!code) {
+      const found = await searchByName(raw);
+      if (found) { code = found; }
+    }
+
+    let quote = null;
+    if (code) {
+      try { quote = await fetchQuote(code); if (quote) displayName = quote.name; }
+      catch(e) { /* 行情获取失败时继续，只用 AI 分析 */ }
+    }
+
+    const aiText = await callDeepSeek(apiKey, displayName, code, quote);
+    renderCard(displayName, code, quote, aiText);
+  } catch(e) {
+    $('result').innerHTML = `<div class="error-card"><p>❌ 出错了：${e.message}</p></div>`;
+  } finally {
+    $('searchBtn').disabled = false;
+  }
+}
+
+// ── 事件绑定 ──────────────────────────────────────
+$('searchBtn').addEventListener('click', doSearch);
+$('stockInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+// 设置弹窗
+function openModal() {
+  const key = LS.get('ds_api_key');
+  $('apiKeyInput').value = key || '';
+  $('emailInput').value = LS.get('author_email') || '';
+  const st = $('keyStatus');
+  if (key) { st.textContent = '✅ API Key 已设置，查询功能已激活'; st.className = 'modal-key-status set'; }
+  else { st.textContent = '⚠️ 尚未设置 API Key，查询功能未激活'; st.className = 'modal-key-status unset'; }
+  $('modalBg').classList.add('open');
+  $('apiKeyInput').focus();
+}
+function closeModal() { $('modalBg').classList.remove('open'); }
+
+$('settingsBtn').addEventListener('click', openModal);
+$('cancelBtn').addEventListener('click', closeModal);
+$('modalBg').addEventListener('click', e => { if (e.target === $('modalBg')) closeModal(); });
+$('saveKeyBtn').addEventListener('click', () => {
+  const key = $('apiKeyInput').value.trim();
+  const email = $('emailInput').value.trim();
+  if (key) LS.set('ds_api_key', key); else LS.del('ds_api_key');
+  if (email) { LS.set('author_email', email); $('authorEmail').textContent = email; $('authorEmail').href = 'mailto:' + email; }
+  closeModal();
+});
+$('clearKeyBtn').addEventListener('click', () => {
+  LS.del('ds_api_key'); $('apiKeyInput').value = '';
+  const st = $('keyStatus');
+  st.textContent = '⚠️ API Key 已清除'; st.className = 'modal-key-status unset';
+});
+
+// 初始化：从 LocalStorage 恢复邮箱
+(function init() {
+  const email = LS.get('author_email') || '779446134@qq.com';
+  $('authorEmail').textContent = email;
+  $('authorEmail').href = 'mailto:' + email;
+})();
+</script>
+</body>
+</html>
